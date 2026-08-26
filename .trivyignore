@@ -1,0 +1,23 @@
+# Trivy misconfig suppressions — accepted for POC
+# Address before production deployment
+
+# SQS queue encryption
+AVD-AWS-0096
+
+# API Gateway access logging
+AVD-AWS-0001
+
+# DynamoDB PITR
+AVD-AWS-0024
+
+# ECR mutable tags — POC uses :latest for simplicity
+AVD-AWS-0031
+
+# Security group unrestricted egress — required for outbound WebSocket
+AVD-AWS-0104
+
+# Subnet public IP — required for Fargate without NAT Gateway
+AVD-AWS-0164
+
+# VPC flow logs — not required for POC
+AVD-AWS-0178

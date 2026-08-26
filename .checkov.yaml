@@ -1,0 +1,50 @@
+# Checkov configuration — suppress findings accepted for this POC.
+# These should be addressed before production deployment.
+skip-check:
+  # Lambda
+  - CKV_AWS_173  # Lambda env var encryption (KMS) — POC uses SSM for secrets
+  - CKV_AWS_115  # Lambda concurrency limit — not needed for POC scale
+  - CKV_AWS_117  # Lambda inside VPC — event router doesn't need VPC access
+  - CKV_AWS_50   # X-Ray tracing — not required for POC
+  - CKV_AWS_272  # Lambda code-signing — not required for POC
+  - CKV_AWS_116  # Lambda DLQ — not required for POC
+
+  # CloudWatch
+  - CKV_AWS_158  # CloudWatch log group KMS encryption — POC uses default encryption
+  - CKV_AWS_338  # CloudWatch log retention 1 year — POC uses 7 days
+
+  # SQS
+  - CKV_AWS_27   # SQS encryption — POC uses default encryption
+
+  # API Gateway
+  - CKV_AWS_76   # API Gateway access logging — not required for POC
+
+  # VPC / Networking
+  - CKV_AWS_130  # Subnets public IP — required for Fargate without NAT Gateway
+  - CKV_AWS_23   # Security group description — cosmetic
+  - CKV_AWS_382  # Egress 0.0.0.0/0 — required for outbound WebSocket connections
+  - CKV2_AWS_11  # VPC flow logging — not required for POC
+  - CKV2_AWS_12  # Default SG restricts all traffic — managed by Terraform SG
+
+  # ECR
+  - CKV_AWS_51   # ECR immutable tags — POC uses :latest for simplicity
+  - CKV_AWS_136  # ECR KMS encryption — POC uses default AES-256
+
+  # ECS
+  - CKV_AWS_65   # ECS container insights — not required for POC
+  - CKV_AWS_336  # ECS read-only root filesystem — worker needs write for temp files
+  - CKV_AWS_333  # ECS public IP — required for Fargate without NAT Gateway
+
+  # DynamoDB
+  - CKV_AWS_119  # DynamoDB CMK encryption — POC uses default encryption
+  - CKV_AWS_28   # DynamoDB PITR — not required for POC
+
+  # Docker
+  - CKV_DOCKER_2 # HEALTHCHECK instruction — not required for POC
+  - CKV_DOCKER_3 # Non-root user — acceptable for POC containers
+
+  # KMS (CloudFormation backend)
+  - CKV_AWS_7    # KMS key rotation — backend template uses AWS-managed rotation
+
+  # S3 (CloudFormation backend)
+  - CKV_AWS_18   # S3 access logging — terraform state bucket, POC scope

@@ -1,0 +1,8 @@
+# Bandit configuration — suppress findings accepted for POC
+skips:
+  # B104: Binding to 0.0.0.0 — intentional for ECS containers
+  - B104
+  # B110: Try/except/pass — used in cleanup code where errors are non-critical
+  - B110
+  # B311: random module — used for simulated transcript timing, not security
+  - B311

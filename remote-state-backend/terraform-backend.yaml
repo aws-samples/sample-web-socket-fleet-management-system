@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Terraform remote state backend with S3 and DynamoDB'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: websocket-poc
+    Description: Project name for resource naming
+  Environment:
+    Type: String
+    Default: devops
+    AllowedValues:
+      - devops
+      - dev
+      - staging
+      - prod
+    Description: Environment name for resource naming
+
+Resources:
+  TerraformStateKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub 'KMS key for ${ProjectName}-${Environment} Terraform state encryption'
+      # CKV_AWS_7: Enable automatic key rotation for customer-created CMKs
+      EnableKeyRotation: true
+      KeyPolicy:
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+            Resource: '*'
+          - Sid: Allow Terraform State Access
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey*'
+              - 'kms:DescribeKey'
+            Resource: '*'
+
+  # Dedicated bucket to receive S3 server access logs. It logs to itself with a
+  # separate prefix, which satisfies the access-logging requirement without
+  # creating an infinite chain of ever-growing log buckets.
+  TerraformStateAccessLogBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-${Environment}-tf-state-logs-${AWS::AccountId}-${AWS::Region}'
+      # Log delivery requires an ACL-based grant; keep ACLs off but allow the
+      # bucket owner to own delivered objects.
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref TerraformStateKMSKey
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      # CKV_AWS_18 / S3_BUCKET_LOGGING_ENABLED: the log bucket logs to itself
+      LoggingConfiguration:
+        DestinationBucketName: !Sub '${ProjectName}-${Environment}-tf-state-logs-${AWS::AccountId}-${AWS::Region}'
+        LogFilePrefix: self-access-logs/
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireAccessLogs
+            Status: Enabled
+            ExpirationInDays: 365
+            NoncurrentVersionExpirationInDays: 90
+
+  TerraformStateBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-${Environment}-terraform-state-${AWS::AccountId}-${AWS::Region}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref TerraformStateKMSKey
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      # CKV_AWS_18 / S3_BUCKET_LOGGING_ENABLED: Enable server access logging
+      LoggingConfiguration:
+        DestinationBucketName: !Ref TerraformStateAccessLogBucket
+        LogFilePrefix: terraform-state-access-logs/
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 90
+
+  TerraformLockTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${ProjectName}-${Environment}-terraform-locks-${AWS::AccountId}-${AWS::Region}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: LockID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: LockID
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref TerraformStateKMSKey
+
+Outputs:
+  S3BucketName:
+    Description: S3 bucket for Terraform state
+    Value: !Ref TerraformStateBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-S3Bucket'
+  
+  DynamoDBTableName:
+    Description: DynamoDB table for Terraform state locking
+    Value: !Ref TerraformLockTable
+    Export:
+      Name: !Sub '${AWS::StackName}-DynamoDBTable'
+
+  TerraformBackendConfig:
+    Description: Terraform backend configuration
+    Value: !Sub |
+      terraform {
+        backend "s3" {
+          bucket         = "${TerraformStateBucket}"
+          key            = "terraform.tfstate"
+          region         = "${AWS::Region}"
+          dynamodb_table = "${TerraformLockTable}"
+          encrypt        = true
+          kms_key_id     = "${TerraformStateKMSKey}"
+        }
+      }

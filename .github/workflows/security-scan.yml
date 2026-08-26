@@ -1,0 +1,76 @@
+name: Security and Lint
+
+# Public-appropriate CI for the sample. Runs static analysis on the Terraform,
+# CloudFormation, and Python sources. No internal tooling or private registries.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  iac-scan:
+    name: IaC security scan (Checkov)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Checkov
+        run: pip install checkov
+
+      - name: Scan Terraform
+        run: checkov -d infrastructure --compact
+
+      - name: Scan CloudFormation backend
+        run: checkov -f remote-state-backend/terraform-backend.yaml --compact
+
+  python-scan:
+    name: Python security scan (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tools
+        run: pip install bandit pip-audit
+
+      - name: Run Bandit
+        run: bandit -r src tests -c .bandit.yaml
+
+      - name: Audit dependencies for known CVEs
+        run: |
+          pip-audit -r src/worker/requirements.txt || true
+          pip-audit -r src/test-ws-server/requirements.txt || true
+          pip-audit -r tests/requirements.txt || true
+
+  terraform-validate:
+    name: Terraform fmt and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt check
+        run: terraform fmt -recursive -check
+        working-directory: infrastructure
+
+      - name: Terraform init and validate
+        run: |
+          terraform init -backend=false
+          terraform validate
+        working-directory: infrastructure
