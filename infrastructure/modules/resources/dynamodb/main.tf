@@ -1,5 +1,6 @@
 # KMS Customer Managed Key for DynamoDB encryption at rest
 resource "aws_kms_key" "this" {
+  # checkov:skip=CKV2_AWS_64: POC — relying on default KMS key policy (account root access). Explicit least-privilege policy deferred.
   description             = "${var.app}-${var.env}-${var.name} DynamoDB encryption"
   enable_key_rotation     = true
   deletion_window_in_days = 30

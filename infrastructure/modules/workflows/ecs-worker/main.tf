@@ -151,6 +151,7 @@ resource "aws_security_group" "ecs" {
 
 # KMS key for ECR image encryption
 resource "aws_kms_key" "ecr" {
+  # checkov:skip=CKV2_AWS_64: POC — relying on default KMS key policy (account root access). Explicit least-privilege policy deferred.
   description             = "${var.app}-${var.env}-worker ECR encryption"
   enable_key_rotation     = true
   deletion_window_in_days = 30

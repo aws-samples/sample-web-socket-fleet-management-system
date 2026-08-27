@@ -35,6 +35,9 @@ skip-check:
   - CKV_AWS_336  # ECS read-only root filesystem — worker needs write for temp files
   - CKV_AWS_333  # ECS public IP — required for Fargate without NAT Gateway
 
+  # KMS
+  - CKV2_AWS_64  # KMS key policy defined — POC relies on default key policy (account root access)
+
   # DynamoDB
   - CKV_AWS_119  # DynamoDB CMK encryption — POC uses default encryption
   - CKV_AWS_28   # DynamoDB PITR — not required for POC
