@@ -251,7 +251,7 @@ This library is licensed under the MIT-0 License. See the [LICENSE](LICENSE) fil
 
 ## Authors
 
-- Siddhesh Tiwari — Data Scientist, AWS Professional Services
+- Siddhesh Tiwari 
 - Ajay Raghunathan
-- Dustin Whitney
-- Chetan Padhiyar - Delivery Consultant, AWS Professional Services
+- Amit Upadhyay
+- Chetan Padhiyar 
